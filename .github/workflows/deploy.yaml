@@ -46,13 +46,14 @@ jobs:
 
       - name: Log in to Amazon ECR
         run: |
+          ECR_REGISTRY=$(echo $FRONTEND_REPO | cut -d'/' -f1)
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+            | docker login --username AWS --password-stdin $ECR_REGISTRY
 
       - name: Build and Push Frontend
         run: |
           docker build \
-            --build-arg VITE_COGNITO_DOMAIN=${{ env.COGNITO_DOMAIN }} \
+            --build-arg VITE_COGNITO_DOMAIN=https://${{ env.COGNITO_DOMAIN }}.auth.${{ secrets.AWS_REGION }}.amazoncognito.com \
             --build-arg VITE_COGNITO_CLIENT_ID=${{ env.COGNITO_CLIENT_ID }} \
             --build-arg VITE_API_BASE=/api \
             -t $FRONTEND_REPO:latest ./frontend
@@ -68,14 +69,12 @@ jobs:
           aws ecs update-service \
             --cluster $CLUSTER \
             --service $FRONTEND_SERVICE \
-            --force-new-deployment \
-            --region ${{ secrets.AWS_REGION }}
+            --force-new-deployment
 
       - name: Force ECS Deployment - Backend
         run: |
           aws ecs update-service \
             --cluster $CLUSTER \
             --service $BACKEND_SERVICE \
-            --force-new-deployment \
-            --region ${{ secrets.AWS_REGION }}
+            --force-new-deployment
 
