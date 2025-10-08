@@ -1,23 +1,20 @@
 # --- Build stage ---
 FROM node:20-alpine AS build
-
 WORKDIR /app
 
-# Copy only dependency manifests first (better layer caching)
-COPY package.json package-lock.json* ./
+# Copy both package.json and package-lock.json (if present)
+COPY package*.json ./
 
-# Install deps
-RUN npm install --production=false
+# Install deps (including recharts)
+RUN npm install
 
-# Copy the rest of your app
+# Copy app source
 COPY . .
 
-# Build-time args for vite
+# Build-time envs
 ARG VITE_COGNITO_DOMAIN
 ARG VITE_COGNITO_CLIENT_ID
 ARG VITE_API_BASE=/api
-
-# Pass them into vite build
 ENV VITE_COGNITO_DOMAIN=$VITE_COGNITO_DOMAIN
 ENV VITE_COGNITO_CLIENT_ID=$VITE_COGNITO_CLIENT_ID
 ENV VITE_API_BASE=$VITE_API_BASE
@@ -27,13 +24,8 @@ RUN npm run build
 
 # --- Runtime stage ---
 FROM nginx:stable-alpine
-
-# Copy built frontend
 COPY --from=build /app/dist /usr/share/nginx/html
-
-# Custom nginx config (reverse proxy /api -> backend service)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["nginx","-g","daemon off;"]
 
