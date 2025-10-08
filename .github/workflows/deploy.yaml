@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write   # for OIDC with AWS
+  id-token: write   # Required for OIDC
   contents: read
 
 jobs:
@@ -43,12 +43,11 @@ jobs:
           echo "BACKEND_SERVICE=$(terraform output -raw backend_service_name)" >> $GITHUB_ENV
           echo "COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
-          echo "ECR_REGISTRY=$(terraform output -raw frontend_repo_url | cut -d'/' -f1)" >> $GITHUB_ENV
 
       - name: Log in to Amazon ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin $ECR_REGISTRY
+            | docker login --username AWS --password-stdin 163895578832.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
       - name: Build and Push Frontend
         run: |

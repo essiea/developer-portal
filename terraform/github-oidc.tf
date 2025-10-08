@@ -30,7 +30,7 @@ data "aws_iam_policy_document" "github_oidc_assume" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/${var.github_branch}"
+        "repo:essiea/developer-portal:ref:refs/heads/main"
       ]
     }
   }

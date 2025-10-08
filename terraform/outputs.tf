@@ -37,3 +37,8 @@ output "cognito_client_id" {
   description = "Cognito client ID"
 }
 
+output "github_actions_role_arn" {
+  description = "IAM role ARN for GitHub Actions OIDC deployments"
+  value       = aws_iam_role.github_actions.arn
+}
+
