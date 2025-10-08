@@ -46,7 +46,16 @@ resource "aws_ecs_service" "frontend_service" {
     security_groups  = [aws_security_group.ecs_service.id]
   }
 
-  depends_on = [aws_ecs_task_definition.frontend_task]
+  load_balancer {
+    target_group_arn = aws_lb_target_group.frontend.arn
+    container_name   = "frontend"
+    container_port   = 80
+  }
+
+  depends_on = [
+    aws_ecs_task_definition.frontend_task,
+    aws_lb_listener.http
+  ]
 }
 
 #################################
@@ -85,7 +94,17 @@ resource "aws_ecs_service" "backend_service" {
     security_groups  = [aws_security_group.ecs_service.id]
   }
 
-  depends_on = [aws_ecs_task_definition.backend_task]
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.backend.arn
+    container_name   = "backend"
+    container_port   = 8000
+  }  
+
+  depends_on = [
+    aws_ecs_task_definition.backend_task,
+    aws_lb_listener.http
+  ]
 }
 
 #################################

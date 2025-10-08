@@ -1,18 +1,24 @@
+#################################
+# Application Load Balancer
+#################################
+resource "aws_lb" "this" {
+  name               = "${var.project_name}-alb"
+  load_balancer_type = "application"
+  subnets            = module.vpc.public_subnets
+  security_groups    = [aws_security_group.alb_sg.id]
+}
+
+#################################
+# Security Group for ALB
+#################################
 resource "aws_security_group" "alb_sg" {
   name        = "${var.project_name}-alb-sg"
-  description = "Security group for ALB"
+  description = "Allow HTTP traffic to ALB"
   vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port   = 80
     to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -25,20 +31,24 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-resource "aws_lb" "this" {
-  name               = "${var.project_name}-alb"
-  internal           = false
-  load_balancer_type = "application"
-  subnets            = module.vpc.public_subnets
-  security_groups    = [aws_security_group.alb_sg.id]
-}
-
+#################################
+# Target Groups
+#################################
 resource "aws_lb_target_group" "frontend" {
   name        = "${var.project_name}-frontend-tg"
   port        = 80
   protocol    = "HTTP"
   vpc_id      = module.vpc.vpc_id
   target_type = "ip"
+
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200-399"
+  }
 }
 
 resource "aws_lb_target_group" "backend" {
@@ -47,33 +57,47 @@ resource "aws_lb_target_group" "backend" {
   protocol    = "HTTP"
   vpc_id      = module.vpc.vpc_id
   target_type = "ip"
+
+  health_check {
+    path                = "/health"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200"
+  }
 }
 
+#################################
+# Listener
+#################################
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend.arn
   }
 }
 
-resource "aws_lb_listener" "https" {
-  load_balancer_arn = aws_lb.this.arn
-  port              = 443
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = aws_acm_certificate_validation.portal_cert_validation[0].certificate_arn
+#################################
+# Listener Rules
+#################################
+resource "aws_lb_listener_rule" "backend_rule" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 10
 
-  default_action {
+  action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend.arn
+    target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/*"]
+    }
   }
 }
 
