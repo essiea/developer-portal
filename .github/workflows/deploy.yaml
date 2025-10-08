@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write   # Required for OIDC
+  id-token: write   # OIDC with AWS
   contents: read
 
 jobs:
@@ -47,7 +47,7 @@ jobs:
       - name: Log in to Amazon ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin 163895578832.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+            | docker login --username AWS --password-stdin ${{ env.FRONTEND_REPO%/* }}
 
       - name: Build and Push Frontend
         run: |
@@ -68,12 +68,14 @@ jobs:
           aws ecs update-service \
             --cluster $CLUSTER \
             --service $FRONTEND_SERVICE \
-            --force-new-deployment
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}
 
       - name: Force ECS Deployment - Backend
         run: |
           aws ecs update-service \
             --cluster $CLUSTER \
             --service $BACKEND_SERVICE \
-            --force-new-deployment
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}
 
