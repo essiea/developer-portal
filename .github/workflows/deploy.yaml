@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write   # OIDC with AWS
+  id-token: write   # for OIDC with AWS
   contents: read
 
 jobs:
@@ -43,14 +43,12 @@ jobs:
           echo "BACKEND_SERVICE=$(terraform output -raw backend_service_name)" >> $GITHUB_ENV
           echo "COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
-
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=$(terraform output -raw frontend_repo_url | cut -d'/' -f1)" >> $GITHUB_ENV
 
       - name: Log in to Amazon ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin ${{ env.FRONTEND_REPO%/* }}
+            | docker login --username AWS --password-stdin $ECR_REGISTRY
 
       - name: Build and Push Frontend
         run: |
@@ -58,17 +56,13 @@ jobs:
             --build-arg VITE_COGNITO_DOMAIN=${{ env.COGNITO_DOMAIN }} \
             --build-arg VITE_COGNITO_CLIENT_ID=${{ env.COGNITO_CLIENT_ID }} \
             --build-arg VITE_API_BASE=/api \
-            -t $FRONTEND_REPO:${{ env.IMAGE_TAG }} ./frontend
-          docker push $FRONTEND_REPO:${{ env.IMAGE_TAG }}
+            -t $FRONTEND_REPO:latest ./frontend
+          docker push $FRONTEND_REPO:latest
 
       - name: Build and Push Backend
         run: |
-          docker build -t $BACKEND_REPO:${{ env.IMAGE_TAG }} ./backend
-          docker push $BACKEND_REPO:${{ env.IMAGE_TAG }}
-
-      - name: Terraform Apply (with image tag)
-        working-directory: ./terraform
-        run: terraform apply -auto-approve -var="image_tag=${{ env.IMAGE_TAG }}"
+          docker build -t $BACKEND_REPO:latest ./backend
+          docker push $BACKEND_REPO:latest
 
       - name: Force ECS Deployment - Frontend
         run: |
