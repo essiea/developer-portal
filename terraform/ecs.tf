@@ -11,6 +11,19 @@ resource "aws_ecs_cluster" "developer_portal_cluster" {
 }
 
 #################################
+# CloudWatch Log Group
+#################################
+resource "aws_cloudwatch_log_group" "ecs" {
+  name              = "/ecs/${var.project_name}-${var.environment}"
+  retention_in_days = 7
+
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
+
+#################################
 # ECS Task Definitions
 #################################
 resource "aws_ecs_task_definition" "frontend_task" {
@@ -30,7 +43,14 @@ resource "aws_ecs_task_definition" "frontend_task" {
       hostPort      = 80
       protocol      = "tcp"
     }]
-    essential = true
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.ecs.name
+        awslogs-region        = var.aws_region
+        awslogs-stream-prefix = "frontend"
+      }
+    }
   }])
 }
 
@@ -51,7 +71,14 @@ resource "aws_ecs_task_definition" "backend_task" {
       hostPort      = 8000
       protocol      = "tcp"
     }]
-    essential = true
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.ecs.name
+        awslogs-region        = var.aws_region
+        awslogs-stream-prefix = "backend"
+      }
+    }
   }])
 }
 
