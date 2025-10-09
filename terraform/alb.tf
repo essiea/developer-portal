@@ -88,7 +88,7 @@ resource "aws_lb_target_group" "backend" {
   vpc_id   = module.vpc.vpc_id
 
   health_check {
-    path                = "/health"
+    path                = "/"
     matcher             = "200-399"
     interval            = 30
     timeout             = 5
