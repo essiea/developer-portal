@@ -65,16 +65,19 @@ jobs:
           docker push $BACKEND_REPO:latest
 
       - name: Force ECS Deployment - Frontend
+        if: success()
         run: |
           aws ecs update-service \
             --cluster $CLUSTER \
             --service $FRONTEND_SERVICE \
             --force-new-deployment
+            --region ${{ secrets.AWS_REGION }}            
 
       - name: Force ECS Deployment - Backend
+        if: success()
         run: |
           aws ecs update-service \
             --cluster $CLUSTER \
             --service $BACKEND_SERVICE \
             --force-new-deployment
-
+            --region ${{ secrets.AWS_REGION }}

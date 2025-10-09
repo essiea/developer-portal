@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import boto3
 import requests
 from jose import jwt, JWTError
+from datetime import datetime, timedelta
 
 app = FastAPI(title="DevPortal API", version="0.1.0")
 
@@ -16,6 +17,7 @@ app.add_middleware(
 )
 
 REGION = os.getenv("AWS_REGION", "us-east-1")
+CLUSTER = os.getenv("ECS_CLUSTER_NAME", "developer-portal-cluster")
 DOCS_BUCKET = os.getenv("DOCS_BUCKET")
 COGNITO_POOL_ID = os.getenv("COGNITO_POOL_ID")
 COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID")
@@ -31,7 +33,7 @@ JWKS = None
 
 def fetch_jwks():
     global JWKS
-    if JWKS is None:
+    if JWKS is None and JWKS_URL:
         r = requests.get(JWKS_URL, timeout=5)
         r.raise_for_status()
         JWKS = r.json()
@@ -68,18 +70,65 @@ def auth_required(authorization: Optional[str] = Header(None)):
     token = parts[1] if len(parts) == 2 else parts[0]
     return verify_token(token)
 
-# ✅ Root health check (basic)
+# ✅ Root health check
 @app.get("/")
 def root():
     return {"status": "ok"}
 
-# ✅ Legacy health check (still works if something points here)
-@app.get("/app/health")
-def app_health():
+# ✅ Explicit health check
+@app.get("/api/health")
+def health():
     return {"status": "ok"}
 
-# ✅ ALB health check (this is what target group uses)
-@app.get("/api/health")
-def api_health():
-    return {"status": "ok"}
+# ✅ ECS Service Metrics (CPU/Memory)
+@app.get("/api/metrics")
+def metrics(service: str, user=Depends(auth_required)):
+    now = datetime.utcnow()
+    start = now - timedelta(minutes=60)
+
+    metrics = {}
+    for metric_name in ["CPUUtilization", "MemoryUtilization"]:
+        resp = cw.get_metric_statistics(
+            Namespace="AWS/ECS",
+            MetricName=metric_name,
+            Dimensions=[
+                {"Name": "ClusterName", "Value": CLUSTER},
+                {"Name": "ServiceName", "Value": service},
+            ],
+            StartTime=start,
+            EndTime=now,
+            Period=60,
+            Statistics=["Average"]
+        )
+        datapoints = sorted(resp["Datapoints"], key=lambda x: x["Timestamp"])
+        metrics[metric_name] = [d["Average"] for d in datapoints]
+
+    return metrics
+
+# ✅ ECS Logs (last 20 lines)
+@app.get("/api/logs")
+def get_logs(service: str, user=Depends(auth_required)):
+    log_group = f"/ecs/{service}"
+    try:
+        streams = logs.describe_log_streams(
+            logGroupName=log_group,
+            orderBy="LastEventTime",
+            descending=True,
+            limit=1
+        )
+        if not streams["logStreams"]:
+            return {"logs": []}
+
+        stream_name = streams["logStreams"][0]["logStreamName"]
+
+        events = logs.get_log_events(
+            logGroupName=log_group,
+            logStreamName=stream_name,
+            limit=20,
+            startFromHead=False
+        )
+        lines = [e["message"] for e in events["events"]]
+        return {"logs": lines}
+    except logs.exceptions.ResourceNotFoundException:
+        return {"logs": []}
 
