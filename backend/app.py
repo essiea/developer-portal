@@ -68,13 +68,18 @@ def auth_required(authorization: Optional[str] = Header(None)):
     token = parts[1] if len(parts) == 2 else parts[0]
     return verify_token(token)
 
-# ✅ Root health check
+# ✅ Root health check (basic)
 @app.get("/")
 def root():
     return {"status": "ok"}
 
-# ✅ Explicit health check
+# ✅ Legacy health check (still works if something points here)
 @app.get("/app/health")
-def health():
+def app_health():
+    return {"status": "ok"}
+
+# ✅ ALB health check (this is what target group uses)
+@app.get("/api/health")
+def api_health():
     return {"status": "ok"}
 
