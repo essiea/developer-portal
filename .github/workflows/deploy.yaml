@@ -43,6 +43,7 @@ jobs:
           echo "BACKEND_SERVICE=$(terraform output -raw backend_service_name)" >> $GITHUB_ENV
           echo "COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
+          echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Log in to Amazon ECR
         run: |
@@ -52,17 +53,21 @@ jobs:
 
       - name: Build and Push Frontend
         run: |
+          set -euo pipefail
           docker build \
             --build-arg VITE_COGNITO_DOMAIN=${{ env.COGNITO_DOMAIN }} \
             --build-arg VITE_COGNITO_CLIENT_ID=${{ env.COGNITO_CLIENT_ID }} \
             --build-arg VITE_API_BASE=/api \
             -t $FRONTEND_REPO:latest ./frontend
+          docker push $FRONTEND_REPO:$(( env.GIT_SHA }}
           docker push $FRONTEND_REPO:latest
 
       - name: Build and Push Backend
         run: |
+          set -euo pipefail
           docker build --no-cache -t $BACKEND_REPO:latest ./backend
-          docker push $BACKEND_REPO:latest
+          docker push $BACKEND_REPO:${{ env.GIT_SHA }}
+          docker push $FRONTEND_REPO:latest
 
       - name: Force ECS Deployment - Frontend
         if: success()
@@ -70,8 +75,16 @@ jobs:
           aws ecs update-service \
             --cluster $CLUSTER \
             --service $FRONTEND_SERVICE \
-            --force-new-deployment
-            --region ${{ secrets.AWS_REGION }}            
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}         
+
+
+      - name: Update ECS Task Definitions
+        working-directory: ./terraform
+        run: |
+          terraform apply -auto-approve \
+            -var="frontend_image=$FRONTEND_REPO:${{ env.GIT_SHA }}" \
+            -var="backend_image=$BACKEND_REPO:${{ env.GIT_SHA }}"   
 
       - name: Force ECS Deployment - Backend
         if: success()
@@ -79,5 +92,5 @@ jobs:
           aws ecs update-service \
             --cluster $CLUSTER \
             --service $BACKEND_SERVICE \
-            --force-new-deployment
+            --force-new-deployment \
             --region ${{ secrets.AWS_REGION }}
