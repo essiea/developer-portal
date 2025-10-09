@@ -10,7 +10,7 @@ output "ecs_cluster_name" {
 
 # Frontend
 output "frontend_repo_url" {
-  value       = aws_ecr_repository.frontend.repository_url
+  value       = aws_ecr_repository.frontend_repo.repository_url
   description = "ECR Repo URL for Frontend"
 }
 
@@ -21,7 +21,7 @@ output "frontend_service_name" {
 
 # Backend
 output "backend_repo_url" {
-  value       = aws_ecr_repository.backend.repository_url
+  value       = aws_ecr_repository.backend_repo.repository_url
   description = "ECR Repo URL for Backend"
 }
 
