@@ -61,7 +61,7 @@ jobs:
 
       - name: Build and Push Backend
         run: |
-          docker build -t $BACKEND_REPO:latest ./backend
+          docker build --no-cache -t $BACKEND_REPO:latest ./backend
           docker push $BACKEND_REPO:latest
 
       - name: Force ECS Deployment - Frontend
