@@ -53,7 +53,7 @@ jobs:
       - name: Build and Push Frontend
         run: |
           docker build \
-            --build-arg VITE_COGNITO_DOMAIN=https://${{ env.COGNITO_DOMAIN }}.auth.${{ secrets.AWS_REGION }}.amazoncognito.com \
+            --build-arg VITE_COGNITO_DOMAIN=${{ env.COGNITO_DOMAIN }} \
             --build-arg VITE_COGNITO_CLIENT_ID=${{ env.COGNITO_CLIENT_ID }} \
             --build-arg VITE_API_BASE=/api \
             -t $FRONTEND_REPO:latest ./frontend

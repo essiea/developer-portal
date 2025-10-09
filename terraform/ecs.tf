@@ -11,7 +11,7 @@ resource "aws_ecs_cluster" "developer_portal_cluster" {
 }
 
 #################################
-# Frontend ECS Service + Task Def
+# ECS Task Definitions
 #################################
 resource "aws_ecs_task_definition" "frontend_task" {
   family                   = "${var.project_name}-frontend"
@@ -22,8 +22,9 @@ resource "aws_ecs_task_definition" "frontend_task" {
   memory                   = "512"
 
   container_definitions = jsonencode([{
-    name  = "frontend"
-    image = var.frontend_image
+    name      = "frontend"
+    image     = var.frontend_image
+    essential = true
     portMappings = [{
       containerPort = 80
       hostPort      = 80
@@ -33,6 +34,30 @@ resource "aws_ecs_task_definition" "frontend_task" {
   }])
 }
 
+resource "aws_ecs_task_definition" "backend_task" {
+  family                   = "${var.project_name}-backend"
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+
+  container_definitions = jsonencode([{
+    name      = "backend"
+    image     = var.backend_image
+    essential = true
+    portMappings = [{
+      containerPort = 8000
+      hostPort      = 8000
+      protocol      = "tcp"
+    }]
+    essential = true
+  }])
+}
+
+#################################
+# ECS Services wired to ALB
+#################################
 resource "aws_ecs_service" "frontend_service" {
   name            = "${var.project_name}-frontend"
   cluster         = aws_ecs_cluster.developer_portal_cluster.id
@@ -54,31 +79,8 @@ resource "aws_ecs_service" "frontend_service" {
 
   depends_on = [
     aws_ecs_task_definition.frontend_task,
-    aws_lb_listener.http
+    aws_lb_listener_rule.frontend_rule
   ]
-}
-
-#################################
-# Backend ECS Service + Task Def
-#################################
-resource "aws_ecs_task_definition" "backend_task" {
-  family                   = "${var.project_name}-backend"
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
-
-  container_definitions = jsonencode([{
-    name  = "backend"
-    image = var.backend_image
-    portMappings = [{
-      containerPort = 8000
-      hostPort      = 8000
-      protocol      = "tcp"
-    }]
-    essential = true
-  }])
 }
 
 resource "aws_ecs_service" "backend_service" {
@@ -94,39 +96,38 @@ resource "aws_ecs_service" "backend_service" {
     security_groups  = [aws_security_group.ecs_service.id]
   }
 
-
   load_balancer {
     target_group_arn = aws_lb_target_group.backend.arn
     container_name   = "backend"
     container_port   = 8000
-  }  
+  }
 
   depends_on = [
     aws_ecs_task_definition.backend_task,
-    aws_lb_listener.http
+    aws_lb_listener_rule.backend_rule
   ]
 }
 
 #################################
-# Security Group for ECS Tasks
+# ECS Service Security Group
 #################################
 resource "aws_security_group" "ecs_service" {
   name        = "${var.project_name}-ecs-sg"
-  description = "Allow traffic to ECS services"
+  description = "Allow traffic from ALB to ECS services"
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id] # Only ALB allowed
   }
 
   ingress {
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 8000
+    to_port         = 8000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   egress {

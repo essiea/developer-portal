@@ -1,19 +1,15 @@
 #######################################
 # Amazon Cognito Configuration
-# Creates: User Pool, App Client, Domain
 #######################################
 
 resource "aws_cognito_user_pool" "devportal_pool" {
-  name = "devportal-userpool"
+  name = "${var.project_name}-userpool"
 
-  # Automatically verify emails
+  # Verify and login by email
   auto_verified_attributes = ["email"]
+  username_attributes      = ["email"]
 
-  # Allow users to sign up with email
-  username_attributes = ["email"]
-
-  # Password and security policy
-
+  # Password policy
   password_policy {
     minimum_length    = 8
     require_uppercase = true
@@ -22,41 +18,40 @@ resource "aws_cognito_user_pool" "devportal_pool" {
     require_symbols   = true
   }
 
-  # Optional: MFA / email verification
+  # MFA (optional)
   mfa_configuration = "OFF"
 
-  # Optional: Customize email messages
   email_verification_message = "Your verification code is {####}"
   email_verification_subject = "Verify your DevPortal account"
 
   tags = {
-    Name        = "devportal-userpool"
+    Project     = var.project_name
     Environment = var.environment
   }
 }
 
 #######################################
-# Cognito App Client
+# Cognito App Client (Hosted UI)
 #######################################
 
 resource "aws_cognito_user_pool_client" "devportal_client" {
-  name         = "devportal-client"
+  name         = "${var.project_name}-client"
   user_pool_id = aws_cognito_user_pool.devportal_pool.id
 
-  # We’re using Cognito Hosted UI
   generate_secret = false
 
-  # Enable modern OAuth flows
-  allowed_oauth_flows = ["code", "implicit"]
+  # Hosted UI OAuth flows
+  allowed_oauth_flows                  = ["code", "implicit"]
+  allowed_oauth_flows_user_pool_client = true
+
   allowed_oauth_scopes = [
     "openid",
     "email",
     "profile"
   ]
-  allowed_oauth_flows_user_pool_client = true
 
   callback_urls = [
-    "https://${var.portal_domain}/",        # After login
+    "https://${var.portal_domain}/",        # Main app redirect
     "https://${var.portal_domain}/api/auth" # API redirect (optional)
   ]
 
@@ -90,7 +85,7 @@ resource "aws_cognito_user_pool_client" "devportal_client" {
 #######################################
 
 resource "aws_cognito_user_pool_domain" "devportal_domain" {
-  domain       = var.cognito_domain # e.g., "devportal"
+  domain       = var.cognito_domain # must be globally unique
   user_pool_id = aws_cognito_user_pool.devportal_pool.id
 }
 
@@ -101,10 +96,13 @@ resource "aws_cognito_user_pool_domain" "devportal_domain" {
 resource "aws_cognito_user" "admin" {
   user_pool_id = aws_cognito_user_pool.devportal_pool.id
   username     = "admin@${var.portal_domain}"
+
   attributes = {
     email          = "admin@${var.portal_domain}"
     email_verified = "true"
   }
+
   temporary_password = "Admin@123!"
   depends_on         = [aws_cognito_user_pool.devportal_pool]
 }
+
