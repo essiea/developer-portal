@@ -20,7 +20,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          role-to-assume: ${{ env.ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Set up Terraform
@@ -36,6 +36,7 @@ jobs:
         id: tfout
         working-directory: ./terraform
         run: |
+          echo "ROLE_ARN=$(terraform output -raw github_actions_role_arn)" >> $GITHUB_ENV
           echo "FRONTEND_REPO=$(terraform output -raw frontend_repo_url)" >> $GITHUB_ENV
           echo "BACKEND_REPO=$(terraform output -raw backend_repo_url)" >> $GITHUB_ENV
           echo "CLUSTER=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_ENV
@@ -44,7 +45,6 @@ jobs:
           echo "COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
           echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
-          echo "AWS_ROLE_TO_ASSUME=$(terraform output -raw github_actions_role_arn)" >> $GITHUB_ENV
 
       - name: Log in to Amazon ECR
         run: |

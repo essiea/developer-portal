@@ -1,22 +1,17 @@
 ##############################################
-# GitHub OIDC IAM Provider + Role
+# GitHub OIDC Provider
 ##############################################
 
-# OIDC provider for GitHub Actions
 resource "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
-
-  client_id_list = [
-    "sts.amazonaws.com"
-  ]
-
-  thumbprint_list = [
-    # Root CA thumbprint for GitHub OIDC (Amazon root CA 1)
-    "6938fd4d98bab03faadb97b34396831e3780aea1"
-  ]
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"] # GitHub’s root CA thumbprint
 }
 
-# IAM Role GitHub Actions will assume
+##############################################
+# GitHub Actions OIDC IAM Role
+##############################################
+
 resource "aws_iam_role" "github_actions" {
   name = "${var.project_name}-github-actions-role"
 
@@ -31,8 +26,10 @@ resource "aws_iam_role" "github_actions" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringLike = {
-            # Repo + branch restriction
             "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/${var.github_repo}:ref:refs/heads/${var.github_branch}"
+          }
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
         }
       }
@@ -40,7 +37,10 @@ resource "aws_iam_role" "github_actions" {
   })
 }
 
-# Inline policy for GitHub Actions to deploy ECS/ECR/Infra
+##############################################
+# Broad policy (narrow later once working)
+##############################################
+
 resource "aws_iam_role_policy" "github_actions_policy" {
   name = "${var.project_name}-github-actions-policy"
   role = aws_iam_role.github_actions.id
@@ -50,34 +50,19 @@ resource "aws_iam_role_policy" "github_actions_policy" {
     Statement = [
       {
         Effect = "Allow"
-        Action = [
-          # ECR
-          "ecr:*",
-          # ECS deployments
-          "ecs:*",
-          # CloudWatch logs
-          "logs:*",
-          # ACM for cert lookups
-          "acm:*",
-          # Cognito for client/user pool lookups
-          "cognito-idp:*",
-          # Route 53 for DNS management
-          "route53:*",
-          # IAM lookups for roles/OIDC provider
-          "iam:GetRole",
-          "iam:GetOpenIDConnectProvider",
-          # EC2 for VPC/subnet descriptions
-          "ec2:DescribeVpcs"
-        ]
+        Action = "*"
         Resource = "*"
       }
     ]
   })
 }
 
-# (Optional) Output so you can reference in GitHub Actions
+##############################################
+# Output the Role ARN
+##############################################
+
 output "github_actions_role_arn" {
+  description = "IAM Role ARN for GitHub Actions OIDC"
   value       = aws_iam_role.github_actions.arn
-  description = "ARN of the IAM role that GitHub Actions will assume"
 }
 
