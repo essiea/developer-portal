@@ -45,6 +45,10 @@ jobs:
           echo "COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
           echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
+<<<<<<< HEAD
+=======
+          echo "ROLE_ARN=$(terraform output -raw github_actions_role_arn)" >> $GITHUB_ENV
+>>>>>>> 5edbcb0620316bef815fa1902ea1b83539cb9744
 
       - name: Log in to Amazon ECR
         run: |
