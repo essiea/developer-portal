@@ -44,8 +44,6 @@ jobs:
           echo "COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
           echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
-          # ✅ export role arn for configure-aws-credentials
-#          echo "::set-output name=github_actions_role_arn::$(terraform output -raw github_actions_role_arn)"
           echo "AWS_ROLE_TO_ASSUME=$(terraform output -raw github_actions_role_arn)" >> $GITHUB_ENV
 
       - name: Log in to Amazon ECR
