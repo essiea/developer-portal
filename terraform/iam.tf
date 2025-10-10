@@ -43,6 +43,7 @@ resource "aws_iam_role" "ecs_task_role" {
   })
 }
 
+# Example: allow tasks to read from S3 (customize for your needs)
 resource "aws_iam_role_policy" "ecs_task_role_policy" {
   name = "${var.project_name}-ecs-task-s3-policy"
   role = aws_iam_role.ecs_task_role.id
@@ -54,86 +55,6 @@ resource "aws_iam_role_policy" "ecs_task_role_policy" {
       Action   = ["s3:GetObject", "s3:ListBucket"]
       Resource = "*"
     }]
-  })
-}
-
-##############################################
-# GitHub Actions Role (for Terraform Deploys)
-##############################################
-
-resource "aws_iam_role" "github_actions_role" {
-  name = "${var.project_name}-github-actions-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Federated = aws_iam_openid_connect_provider.github.arn
-      }
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Condition = {
-        StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:*"
-        }
-      }
-    }]
-  })
-}
-
-# Inline policy for GitHub Actions Terraform deploy
-resource "aws_iam_role_policy" "github_actions_policy" {
-  name = "${var.project_name}-github-actions-policy"
-  role = aws_iam_role.github_actions_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          # ECR for build/push
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:CompleteLayerUpload",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:InitiateLayerUpload",
-          "ecr:PutImage",
-          "ecr:UploadLayerPart",
-          "ecr:DescribeRepositories",
-
-          # ECS deploys
-          "ecs:UpdateService",
-          "ecs:DescribeServices",
-          "ecs:RegisterTaskDefinition",
-
-          # CloudWatch logs
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-
-          # Cognito reads
-          "cognito-idp:DescribeUserPool",
-          "cognito-idp:DescribeUserPoolClient",
-
-          # ACM certs
-          "acm:DescribeCertificate",
-
-          # Route53 zone lookup
-          "route53:ListHostedZones",
-          "route53:GetHostedZone",
-
-          # IAM reads (for OIDC + roles)
-          "iam:GetRole",
-          "iam:GetOpenIDConnectProvider",
-
-          # VPC lookups
-          "ec2:DescribeVpcs",
-          "ec2:DescribeSubnets",
-          "ec2:DescribeSecurityGroups"
-        ]
-        Resource = "*"
-      }
-    ]
   })
 }
 
