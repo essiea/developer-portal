@@ -55,9 +55,9 @@ output "backend_service_name" {
 #################################
 # Cognito
 #################################
-output "cognito_domain" {
+output "cognito_domain_full" {
   description = "Cognito domain for hosted UI"
-  value       = "${aws_cognito_user_pool_domain.devportal_domain.domain}.auth.${var.aws_region}.amazoncognito.com"
+  value       = "https://${aws_cognito_user_pool_domain.devportal_domain.domain}.auth.${var.region}.amazoncognito.com"
 }
 
 output "cognito_client_id" {
