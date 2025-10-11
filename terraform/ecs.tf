@@ -27,7 +27,7 @@ resource "aws_cloudwatch_log_group" "ecs" {
 # ECS Task Definitions
 #################################
 resource "aws_ecs_task_definition" "frontend_task" {
-  family                   = "${var.project_name}-frontend"
+  family                   = "${var.project_name}-frontend-${var.environment}"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
@@ -55,7 +55,7 @@ resource "aws_ecs_task_definition" "frontend_task" {
 }
 
 resource "aws_ecs_task_definition" "backend_task" {
-  family                   = "${var.project_name}-backend"
+  family                   = "${var.project_name}-backend-${var.environment}"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
