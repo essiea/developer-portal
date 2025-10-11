@@ -70,3 +70,13 @@ output "portal_url" {
   description = "Developer Portal URL"
   value       = "https://${var.environment}.devportal.kanedata.net"
 }
+
+#######################################
+# Cognito Hosted UI URL Output
+#######################################
+
+output "cognito_login_url" {
+  description = "Direct login URL for Cognito Hosted UI"
+  value       = "https://${aws_cognito_user_pool_domain.devportal_domain.domain}.auth.${var.region}.amazoncognito.com/login?client_id=${aws_cognito_user_pool_client.devportal_client.id}&response_type=code&scope=openid+profile+email&redirect_uri=https://${var.environment}.devportal.kanedata.net/"
+}
+

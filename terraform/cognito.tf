@@ -35,28 +35,22 @@ resource "aws_cognito_user_pool" "devportal_pool" {
 #######################################
 
 resource "aws_cognito_user_pool_client" "devportal_client" {
-  name         = "${var.project_name}-client"
-  user_pool_id = aws_cognito_user_pool.devportal_pool.id
-
+  name            = "${var.project_name}-client"
+  user_pool_id    = aws_cognito_user_pool.devportal_pool.id
   generate_secret = false
 
   # Hosted UI OAuth flows
-  allowed_oauth_flows                  = ["code", "implicit"]
   allowed_oauth_flows_user_pool_client = true
-
-  allowed_oauth_scopes = [
-    "openid",
-    "email",
-    "profile"
-  ]
+  allowed_oauth_flows                  = ["code", "implicit"]
+  allowed_oauth_scopes                 = ["openid", "profile", "email"]
 
   callback_urls = [
-    "https://${var.portal_domain}/",        # Main app redirect
-    "https://${var.portal_domain}/api/auth" # API redirect (optional)
+    "https://${var.environment}.devportal.kanedata.net/",
+    "https://${var.environment}.devportal.kanedata.net/api/auth"
   ]
 
   logout_urls = [
-    "https://${var.portal_domain}/"
+    "https://${var.environment}.devportal.kanedata.net/"
   ]
 
   supported_identity_providers = ["COGNITO"]
