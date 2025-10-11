@@ -63,11 +63,6 @@ jobs:
           echo "PORTAL_URL=$(terraform output -raw portal_url)" >> $GITHUB_ENV
           echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
 
-    if [ -z "$COGNITO_DOMAIN" ] || [ "$COGNITO_DOMAIN" = "null" ]; then
-      echo "❌ COGNITO_DOMAIN not found in outputs. Check outputs.tf."
-      exit 1
-    fi
-
       - name: Print Portal URL
         run: |
           echo "✅ Deployment complete!"
