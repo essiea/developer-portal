@@ -44,7 +44,7 @@ resource "aws_acm_certificate_validation" "devportal_cert" {
 #################################
 resource "aws_route53_record" "devportal_alias" {
   zone_id = data.aws_route53_zone.kanedata_net.zone_id
-  name    = "devportal.kanedata.net"
+  name    = "${var.environment}.devportal.kanedata.net"
   type    = "A"
 
   alias {

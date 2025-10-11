@@ -85,7 +85,7 @@ resource "aws_cognito_user_pool_client" "devportal_client" {
 #######################################
 
 resource "aws_cognito_user_pool_domain" "devportal_domain" {
-  domain       = var.cognito_domain # must be globally unique
+  domain       = var.cognito_domain_prefixes[var.environment] # must be globally unique
   user_pool_id = aws_cognito_user_pool.devportal_pool.id
 }
 

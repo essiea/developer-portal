@@ -37,7 +37,7 @@ resource "aws_security_group" "alb_sg" {
 # Application Load Balancer
 #################################
 resource "aws_lb" "devportal" {
-  name               = "${var.project_name}-alb"
+  name               = "${var.name_prefix}-alb-${var.environment}"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
@@ -55,7 +55,7 @@ resource "aws_lb" "devportal" {
 # Target Groups
 #################################
 resource "aws_lb_target_group" "frontend" {
-  name     = "${var.project_name}-frontend-tg"
+  name     = "${var.name_prefix}-frontend-tg-${var.environment}"
   port     = 80
   protocol = "HTTP"
   target_type = "ip"
@@ -81,7 +81,7 @@ resource "aws_lb_target_group" "frontend" {
 }
 
 resource "aws_lb_target_group" "backend" {
-  name     = "${var.project_name}-backend-tg"
+  name     = "${var.name_prefix}-backend-tg-${var.environment}"
   port     = 8000
   protocol = "HTTP"
   target_type = "ip"

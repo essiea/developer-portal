@@ -2,7 +2,7 @@
 # Frontend ECR Repository
 #################################
 resource "aws_ecr_repository" "frontend_repo" {
-  name                 = "${var.project_name}-frontend"
+  name                 = "${var.name_prefix}-frontend-${var.environment}"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
@@ -40,7 +40,7 @@ resource "aws_ecr_lifecycle_policy" "frontend_policy" {
 # Backend ECR Repository
 #################################
 resource "aws_ecr_repository" "backend_repo" {
-  name                 = "${var.project_name}-backend"
+  name                 = "${var.name_prefix}-backend-${var.environment}"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {

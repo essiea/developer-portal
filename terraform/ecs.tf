@@ -86,7 +86,7 @@ resource "aws_ecs_task_definition" "backend_task" {
 # ECS Services wired to ALB
 #################################
 resource "aws_ecs_service" "frontend_service" {
-  name            = "${var.project_name}-frontend"
+  name            = "${var.name_prefix}-frontend-${var.environment}"
   cluster         = aws_ecs_cluster.developer_portal_cluster.id
   task_definition = aws_ecs_task_definition.frontend_task.arn
   desired_count   = 1
@@ -111,7 +111,7 @@ resource "aws_ecs_service" "frontend_service" {
 }
 
 resource "aws_ecs_service" "backend_service" {
-  name            = "${var.project_name}-backend"
+  name            = "${var.name_prefix}-backend-${var.environment}"
   cluster         = aws_ecs_cluster.developer_portal_cluster.id
   task_definition = aws_ecs_task_definition.backend_task.arn
   desired_count   = 1

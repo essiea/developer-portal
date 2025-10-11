@@ -64,3 +64,9 @@ output "cognito_client_id" {
   description = "Cognito app client ID"
   value       = aws_cognito_user_pool_client.devportal_client.id
 }
+
+# 🚀 NEW: full portal URL per environment
+output "portal_url" {
+  description = "Developer Portal URL"
+  value       = "https://${var.environment}.devportal.kanedata.net"
+}

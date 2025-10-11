@@ -43,7 +43,13 @@ jobs:
           echo "BACKEND_SERVICE=$(terraform output -raw backend_service_name)" >> $GITHUB_ENV
           echo "COGNITO_DOMAIN=$(terraform output -raw cognito_domain)" >> $GITHUB_ENV
           echo "COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
+          echo "PORTAL_URL=$(terraform output -raw portal_url)" >> $GITHUB_ENV
           echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
+
+      - name: Print Portal URL
+        run: |
+          echo "✅ Deployment complete!"
+          echo "🌐 Portal is available at: $PORTAL_URL"
 
       - name: Log in to Amazon ECR
         run: |
@@ -73,6 +79,7 @@ jobs:
       - name: Update ECS Task Definitions
         working-directory: ./terraform
         run: |
+          -var="environment=dev"
           terraform apply -auto-approve \
             -var="frontend_image=$FRONTEND_REPO:${{ env.GIT_SHA }}" \
             -var="backend_image=$BACKEND_REPO:${{ env.GIT_SHA }}"

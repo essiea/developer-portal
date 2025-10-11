@@ -13,6 +13,22 @@ variable "portal_domain" {
   type        = string
 }
 
+variable "name_prefix" {
+  description = "Base name for resources (env aware)"
+  type        = string
+  default     = "developer-portal"
+}
+
+variable "cognito_domain_prefixes" {
+  description = "Map of environment to Cognito domain prefix"
+  type        = map(string)
+  default = {
+    dev  = "mycompany-devportal-dev"
+    uat  = "mycompany-devportal-uat"
+    prod = "mycompany-devportal-prod"
+  }
+}
+
 variable "frontend_image" {
   description = "Frontend image URI"
   type        = string
