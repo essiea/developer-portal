@@ -36,6 +36,23 @@ jobs:
         id: tfout
         working-directory: ./terraform
         run: |
+
+          set -euo pipefail
+          terraform output -json > tf_outputs.json
+
+          FRONTEND_REPO=$(jq -r '.frontend_repo_url.value' tf_outputs.json)
+          BACKEND_REPO=$(jq -r '.backend_repo_url.value' tf_outputs.json)
+          CLUSTER=$(jq -r '.ecs_cluster_name.value' tf_outputs.json)
+          FRONTEND_SERVICE=$(jq -r '.frontend_service_name.value' tf_outputs.json)
+          BACKEND_SERVICE=$(jq -r '.backend_service_name.value' tf_outputs.json)
+          COGNITO_DOMAIN=$(jq -r '.cognito_domain_full.value' tf_outputs.json)
+          COGNITO_CLIENT_ID=$(jq -r '.cognito_client_id.value' tf_outputs.json)
+
+          if [ -z "$COGNITO_DOMAIN" ] || [ "$COGNITO_DOMAIN" = "null" ]; then
+            echo "❌ COGNITO_DOMAIN not found in outputs. Check outputs.tf."
+            exit 1
+          fi
+
           echo "FRONTEND_REPO=$(terraform output -raw frontend_repo_url)" >> $GITHUB_ENV
           echo "BACKEND_REPO=$(terraform output -raw backend_repo_url)" >> $GITHUB_ENV
           echo "CLUSTER=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_ENV
@@ -45,6 +62,11 @@ jobs:
           echo "COGNITO_CLIENT_ID=$(terraform output -raw cognito_client_id)" >> $GITHUB_ENV
           echo "PORTAL_URL=$(terraform output -raw portal_url)" >> $GITHUB_ENV
           echo "GIT_SHA=${{ github.sha }}" >> $GITHUB_ENV
+
+    if [ -z "$COGNITO_DOMAIN" ] || [ "$COGNITO_DOMAIN" = "null" ]; then
+      echo "❌ COGNITO_DOMAIN not found in outputs. Check outputs.tf."
+      exit 1
+    fi
 
       - name: Print Portal URL
         run: |
