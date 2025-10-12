@@ -71,15 +71,35 @@ resource "aws_ecs_task_definition" "backend_task" {
       hostPort      = 8000
       protocol      = "tcp"
     }]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        awslogs-group         = aws_cloudwatch_log_group.ecs.name
-        awslogs-region        = var.aws_region
-        awslogs-stream-prefix = "backend"
+
+    environment = [
+      {
+        name  = "AWS_REGION"
+        value = var.region
+      },
+      {
+        name  = "CLUSTER_NAME"
+        value = aws_ecs_cluster.developer_portal_cluster.name
+      },
+      {
+          name  = "DOCS_BUCKET"
+          value = "developer-portal-docs-163895578832"
+        },
+        {
+          name  = "DOCS_KEY"
+          value = "README.md"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/${var.project_name}/backend"
+          awslogs-region        = var.region
+          awslogs-stream-prefix = "ecs"
+        }
       }
     }
-  }])
+  ])
 }
 
 #################################
