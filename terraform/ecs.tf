@@ -48,7 +48,7 @@ resource "aws_ecs_task_definition" "frontend_task" {
       options = {
         awslogs-group         = aws_cloudwatch_log_group.ecs.name
         awslogs-region        = var.aws_region
-        awslogs-stream-prefix = "frontend"
+        awslogs-stream-prefix = "ecs"
       }
     }
   }])
@@ -94,8 +94,8 @@ resource "aws_ecs_task_definition" "backend_task" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          awslogs-group         = "/ecs/${var.project_name}/backend"
-          awslogs-region        = var.region
+          awslogs-group         = aws_cloudwatch_log_group.ecs.name
+          awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
         }
       }
