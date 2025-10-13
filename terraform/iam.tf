@@ -43,34 +43,60 @@ resource "aws_iam_role" "ecs_task_role" {
   })
 }
 
-# Example: allow tasks to read from S3 (customize for your needs)
-resource "aws_iam_role_policy" "ecs_task_role_policy" {
-  name = "${var.project_name}-ecs-task-s3-policy"
-  role = aws_iam_role.ecs_task_role.id
+resource "aws_iam_role_policy" "ecs_exec_ssm_access" {
+  name = "${var.project_name}-ecs-exec-ssm-policy"
+  role = aws_iam_role.ecs_task_execution.name
 
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version = "2012-10-17",
     Statement = [
       {
-        Effect = "Allow"
+        Effect = "Allow",
         Action = [
-          "ecs:DescribeClusters",
-          "ecs:ListServices",
-          "ecs:DescribeServices",
-          "ecs:ListTasks",
-          "ecs:DescribeTasks",
-          "cloudwatch:GetMetricData",
-          "cloudwatch:GetMetricStatistics",
-          "cloudwatch:ListMetrics",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-          "logs:GetLogEvents",
-          "s3:GetObject",
-          "s3:ListBucket"
-        ]
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",
+          "ssm:DescribeSessions",
+          "ssm:GetConnectionStatus",
+          "ssm:StartSession",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
         Resource = "*"
       }
     ]
   })
 }
 
+# ============================================================
+# ECS Task Observability + Exec Permissions
+# ============================================================
+resource "aws_iam_role_policy" "ecs_task_observability_policy" {
+  name = "${var.project_name}-ecs-task-observability-policy"
+  role = aws_iam_role.ecs_task_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          # ECS Exec / SSM Session
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams",
+          "logs:GetLogEvents",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "ecs:DescribeClusters",
+          "ecs:DescribeServices"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}

@@ -1,6 +1,7 @@
-import os, time
+import os
+import json
 from typing import Optional
-from fastapi import FastAPI, Header, HTTPException, Depends, Query
+from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import boto3
 import requests
@@ -11,26 +12,30 @@ app = FastAPI(title="DevPortal API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ALB/Cognito handle auth; keep CORS simple for local/dev
+    allow_origins=["*"],  # ALB/Cognito handle auth
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# === Environment ===
 REGION = os.getenv("AWS_REGION", "us-east-1")
-CLUSTER = os.getenv("ECS_CLUSTER_NAME", "developer-portal-cluster")
-DOCS_BUCKET = os.getenv("DOCS_BUCKET")
+CLUSTER = os.getenv("CLUSTER_NAME", "developer-portal-cluster")
+DOCS_BUCKET = os.getenv("DOCS_BUCKET", "")
+DOCS_KEY = os.getenv("DOCS_KEY", "README.md")
 COGNITO_POOL_ID = os.getenv("COGNITO_POOL_ID")
 COGNITO_CLIENT_ID = os.getenv("COGNITO_CLIENT_ID")
 COGNITO_ISSUER = f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_POOL_ID}" if COGNITO_POOL_ID else None
 JWKS_URL = f"{COGNITO_ISSUER}/.well-known/jwks.json" if COGNITO_POOL_ID else None
 
+# === AWS Clients ===
 ecs = boto3.client("ecs", region_name=REGION)
 logs = boto3.client("logs", region_name=REGION)
-s3 = boto3.client("s3", region_name=REGION)
 cw = boto3.client("cloudwatch", region_name=REGION)
+s3 = boto3.client("s3", region_name=REGION)
 
 JWKS = None
 
+# === Auth Helpers ===
 def fetch_jwks():
     global JWKS
     if JWKS is None and JWKS_URL:
@@ -66,46 +71,45 @@ def verify_token(token: str):
 def auth_required(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
-    parts = authorization.split()
-    token = parts[1] if len(parts) == 2 else parts[0]
+    token = authorization.split()[-1]
     return verify_token(token)
 
-# ✅ Root health check
+# === Health Checks ===
 @app.get("/")
 def root():
     return {"status": "ok"}
 
-# ✅ Explicit health check
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
 
-# ✅ ECS Service Metrics (CPU/Memory)
+# === ECS Metrics (CPU/Memory) ===
 @app.get("/api/metrics")
 def metrics(service: str, user=Depends(auth_required)):
     now = datetime.utcnow()
     start = now - timedelta(minutes=60)
-
     metrics = {}
-    for metric_name in ["CPUUtilization", "MemoryUtilization"]:
-        resp = cw.get_metric_statistics(
-            Namespace="AWS/ECS",
-            MetricName=metric_name,
-            Dimensions=[
-                {"Name": "ClusterName", "Value": CLUSTER},
-                {"Name": "ServiceName", "Value": service},
-            ],
-            StartTime=start,
-            EndTime=now,
-            Period=60,
-            Statistics=["Average"]
-        )
-        datapoints = sorted(resp["Datapoints"], key=lambda x: x["Timestamp"])
-        metrics[metric_name] = [d["Average"] for d in datapoints]
+    try:
+        for metric_name in ["CPUUtilization", "MemoryUtilization"]:
+            resp = cw.get_metric_statistics(
+                Namespace="AWS/ECS",
+                MetricName=metric_name,
+                Dimensions=[
+                    {"Name": "ClusterName", "Value": CLUSTER},
+                    {"Name": "ServiceName", "Value": service},
+                ],
+                StartTime=start,
+                EndTime=now,
+                Period=60,
+                Statistics=["Average"]
+            )
+            datapoints = sorted(resp.get("Datapoints", []), key=lambda x: x["Timestamp"])
+            metrics[metric_name] = [round(d["Average"], 2) for d in datapoints]
+        return metrics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Metrics fetch failed: {str(e)}")
 
-    return metrics
-
-# ✅ ECS Logs (last 20 lines)
+# === ECS Logs (Recent) ===
 @app.get("/api/logs")
 def get_logs(service: str, user=Depends(auth_required)):
     log_group = f"/ecs/{service}"
@@ -116,19 +120,33 @@ def get_logs(service: str, user=Depends(auth_required)):
             descending=True,
             limit=1
         )
-        if not streams["logStreams"]:
+        if not streams.get("logStreams"):
             return {"logs": []}
 
         stream_name = streams["logStreams"][0]["logStreamName"]
-
         events = logs.get_log_events(
             logGroupName=log_group,
             logStreamName=stream_name,
-            limit=20,
+            limit=50,
             startFromHead=False
         )
-        lines = [e["message"] for e in events["events"]]
+        lines = [e["message"] for e in events.get("events", [])]
         return {"logs": lines}
     except logs.exceptions.ResourceNotFoundException:
         return {"logs": []}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Logs fetch failed: {str(e)}")
+
+# === Docs from S3 (README.md etc.) ===
+@app.get("/api/docs/{path:path}")
+def get_docs(path: str, user=Depends(auth_required)):
+    try:
+        key = path or DOCS_KEY
+        resp = s3.get_object(Bucket=DOCS_BUCKET, Key=key)
+        content = resp["Body"].read().decode("utf-8")
+        return {"content": content}
+    except s3.exceptions.NoSuchKey:
+        raise HTTPException(status_code=404, detail=f"Document {key} not found in {DOCS_BUCKET}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Docs fetch failed: {str(e)}")
 

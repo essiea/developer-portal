@@ -57,6 +57,7 @@ resource "aws_ecs_task_definition" "frontend_task" {
 resource "aws_ecs_task_definition" "backend_task" {
   family                   = "${var.project_name}-backend-${var.environment}"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn   # ✅ Required for CloudWatch & ECS Exec
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -136,6 +137,9 @@ resource "aws_ecs_service" "backend_service" {
   task_definition = aws_ecs_task_definition.backend_task.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+
+  # ✅ Enables ECS Exec
+  enable_execute_command = true
 
   network_configuration {
     subnets          = module.vpc.private_subnets
