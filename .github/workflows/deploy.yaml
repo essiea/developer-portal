@@ -97,7 +97,7 @@ jobs:
         run: |
           terraform apply -auto-approve \
             -var="frontend_image=$FRONTEND_REPO:${{ env.GIT_SHA }}" \
-            -var="backend_image=$BACKEND_REPO:${{ env.GIT_SHA }}"
+            -var="backend_image=$BACKEND_REPO:${{ env.GIT_SHA }}" \
             -var="ecs_cluster_name=${{ env.CLUSTER }}"
 
       - name: Force ECS Deployment - Frontend
