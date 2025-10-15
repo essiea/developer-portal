@@ -8,14 +8,6 @@ resource "aws_ecs_cluster" "developer_portal_cluster" {
     name  = "containerInsights"
     value = "enabled"
   }
-}
-
-#################################
-# CloudWatch Log Group
-#################################
-resource "aws_cloudwatch_log_group" "ecs" {
-  name              = "/ecs/${var.project_name}-${var.environment}"
-  retention_in_days = 7
 
   tags = {
     Project     = var.project_name
@@ -24,11 +16,25 @@ resource "aws_cloudwatch_log_group" "ecs" {
 }
 
 #################################
-# ECS Task Definitions
+# CloudWatch Log Groups
+#################################
+resource "aws_cloudwatch_log_group" "frontend_logs" {
+  name              = "/ecs/${var.project_name}-${var.environment}-frontend"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "backend_logs" {
+  name              = "/ecs/${var.project_name}-${var.environment}-backend"
+  retention_in_days = 7
+}
+
+#################################
+# Frontend Task Definition
 #################################
 resource "aws_ecs_task_definition" "frontend_task" {
   family                   = "${var.project_name}-frontend-${var.environment}"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn  # ✅ Add this line
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -43,21 +49,38 @@ resource "aws_ecs_task_definition" "frontend_task" {
       hostPort      = 80
       protocol      = "tcp"
     }]
+    environment = [
+      {
+        name  = "VITE_COGNITO_DOMAIN"
+        value = "https://${aws_cognito_user_pool_domain.devportal_domain.domain}.auth.${var.region}.amazoncognito.com"
+      },
+      {
+        name  = "VITE_COGNITO_CLIENT_ID"
+        value = aws_cognito_user_pool_client.devportal_client.id
+      },
+      {
+        name  = "VITE_API_BASE"
+        value = "/api"
+      }
+    ]
     logConfiguration = {
       logDriver = "awslogs"
       options = {
-        awslogs-group         = aws_cloudwatch_log_group.ecs.name
-        awslogs-region        = var.aws_region
-        awslogs-stream-prefix = "ecs"
+        awslogs-group         = aws_cloudwatch_log_group.frontend_logs.name
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "frontend"
       }
     }
   }])
 }
 
+#################################
+# Backend Task Definition
+#################################
 resource "aws_ecs_task_definition" "backend_task" {
   family                   = "${var.project_name}-backend-${var.environment}"
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
-  task_role_arn            = aws_iam_role.ecs_task_role.arn   # ✅ Required for CloudWatch & ECS Exec
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
@@ -72,39 +95,45 @@ resource "aws_ecs_task_definition" "backend_task" {
       hostPort      = 8000
       protocol      = "tcp"
     }]
-
     environment = [
       {
         name  = "AWS_REGION"
         value = var.region
       },
       {
-        name  = "CLUSTER_NAME"
+        name  = "ECS_CLUSTER_NAME"
         value = aws_ecs_cluster.developer_portal_cluster.name
       },
       {
-          name  = "DOCS_BUCKET"
-          value = "developer-portal-docs-163895578832"
-        },
-        {
-          name  = "DOCS_KEY"
-          value = "README.md"
-        }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.ecs.name
-          awslogs-region        = var.aws_region
-          awslogs-stream-prefix = "ecs"
-        }
+        name  = "DOCS_BUCKET"
+        value = "developer-portal-docs-163895578832"
+      },
+      {
+        name  = "DOCS_KEY"
+        value = "README.md"
+      },
+      {
+        name  = "COGNITO_POOL_ID"
+        value = aws_cognito_user_pool.devportal_pool.id
+      },
+      {
+        name  = "COGNITO_CLIENT_ID"
+        value = aws_cognito_user_pool_client.devportal_client.id
+      }
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.backend_logs.name
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "backend"
       }
     }
-  ])
+  }])
 }
 
 #################################
-# ECS Services wired to ALB
+# Frontend ECS Service
 #################################
 resource "aws_ecs_service" "frontend_service" {
   name            = "${var.name_prefix}-frontend-${var.environment}"
@@ -112,9 +141,10 @@ resource "aws_ecs_service" "frontend_service" {
   task_definition = aws_ecs_task_definition.frontend_task.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+  enable_execute_command = true
 
   network_configuration {
-    subnets          = module.vpc.private_subnets
+    subnets          = module.vpc.public_subnets
     assign_public_ip = true
     security_groups  = [aws_security_group.ecs_service.id]
   }
@@ -131,19 +161,20 @@ resource "aws_ecs_service" "frontend_service" {
   ]
 }
 
+#################################
+# Backend ECS Service
+#################################
 resource "aws_ecs_service" "backend_service" {
   name            = "${var.name_prefix}-backend-${var.environment}"
   cluster         = aws_ecs_cluster.developer_portal_cluster.id
   task_definition = aws_ecs_task_definition.backend_task.arn
   desired_count   = 1
   launch_type     = "FARGATE"
-
-  # ✅ Enables ECS Exec
   enable_execute_command = true
 
   network_configuration {
     subnets          = module.vpc.private_subnets
-    assign_public_ip = true
+    assign_public_ip = false
     security_groups  = [aws_security_group.ecs_service.id]
   }
 
@@ -160,7 +191,7 @@ resource "aws_ecs_service" "backend_service" {
 }
 
 #################################
-# ECS Service Security Group
+# ECS Security Group
 #################################
 resource "aws_security_group" "ecs_service" {
   name        = "${var.project_name}-ecs-sg"
@@ -171,7 +202,7 @@ resource "aws_security_group" "ecs_service" {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id] # Only ALB allowed
+    security_groups = [aws_security_group.alb_sg.id]
   }
 
   ingress {
