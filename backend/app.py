@@ -7,6 +7,13 @@ import boto3
 import requests
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
+import logging
+logging.basicConfig(level=logging.INFO)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logging.exception("Unhandled exception: %s", exc)
+    return {"error": str(exc)}
 
 app = FastAPI(title="DevPortal API", version="0.1.0")
 
@@ -142,7 +149,7 @@ def get_logs(service: str, user=Depends(auth_required)):
 def get_docs(path: str, user=Depends(auth_required)):
     try:
         key = path or DOCS_KEY
-        resp = s3.get_object(Bucket=DOCS_BUCKET, Key=key)
+        resp = s3.get_object(Bucket=DOCS_BUCKET, Key=DOCS_KEY)
         content = resp["Body"].read().decode("utf-8")
         return {"content": content}
     except s3.exceptions.NoSuchKey:
