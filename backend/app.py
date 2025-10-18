@@ -1,22 +1,26 @@
 import os
 import json
 from typing import Optional
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 import boto3
 import requests
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 import logging
+
 logging.basicConfig(level=logging.INFO)
 
+# ✅ Initialize FastAPI first
+app = FastAPI(title="DevPortal API", version="0.1.0")
+
+# ✅ Exception handler AFTER app is created
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: Request, exc: Exception):
     logging.exception("Unhandled exception: %s", exc)
     return {"error": str(exc)}
 
-app = FastAPI(title="DevPortal API", version="0.1.0")
-
+# ✅ CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # ALB/Cognito handle auth
